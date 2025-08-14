@@ -10,11 +10,9 @@ export default function CoinViewer() {
     useEffect(() => {
         if (!mountRef.current) return;
 
-        // ----- Scene -----
         const scene = new THREE.Scene();
         scene.background = null;
 
-        // ----- Camera -----
         const camera = new THREE.PerspectiveCamera(
             45,
             mountRef.current.clientWidth / mountRef.current.clientHeight,
@@ -23,52 +21,49 @@ export default function CoinViewer() {
         );
         camera.position.set(0, 0, 7);
 
-        // ----- Renderer -----
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setPixelRatio(window.devicePixelRatio || 1);
         renderer.setSize(mountRef.current.clientWidth, mountRef.current.clientHeight);
         renderer.outputColorSpace = THREE.SRGBColorSpace;
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 2.0; // 밝기 극대화
+        renderer.toneMappingExposure = 2.2;
         renderer.setClearColor(0x000000, 0);
         mountRef.current.appendChild(renderer.domElement);
 
-        // ----- Controls -----
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
 
-        // ----- Lights (양면) -----
-        // 앞면 조명
-        const keyFront = new THREE.DirectionalLight(0xfff8dc, 2.5);
+        // ----- Front Lights -----
+        const keyFront = new THREE.DirectionalLight(0xfff8dc, 3.0);
         keyFront.position.set(3, 4, 5);
         scene.add(keyFront);
 
-        const fillFront = new THREE.DirectionalLight(0xffffff, 2.0);
+        const fillFront = new THREE.DirectionalLight(0xffffff, 2.2);
         fillFront.position.set(-3, 2, 3);
         scene.add(fillFront);
 
-        const rimFront = new THREE.DirectionalLight(0xfffacd, 1.2);
+        const rimFront = new THREE.DirectionalLight(0xfffacd, 1.5);
         rimFront.position.set(0, 5, -4);
         scene.add(rimFront);
 
-        const pointFront = new THREE.PointLight(0xffffff, 1.5, 10);
+        const pointFront = new THREE.PointLight(0xffffff, 2.0, 10);
         pointFront.position.set(0, 3, 3);
         scene.add(pointFront);
 
-        // 뒷면 조명 (반대편)
-        const keyBack = new THREE.DirectionalLight(0xfff8dc, 2.0);
+        // ----- Back Lights -----
+        const keyBack = new THREE.DirectionalLight(0xfff8dc, 2.5);
         keyBack.position.set(-3, -4, -5);
         scene.add(keyBack);
 
-        const fillBack = new THREE.DirectionalLight(0xffffff, 1.5);
+        const fillBack = new THREE.DirectionalLight(0xffffff, 2.0);
         fillBack.position.set(3, -2, -3);
         scene.add(fillBack);
 
-        const rimBack = new THREE.DirectionalLight(0xfffacd, 1.0);
+        const rimBack = new THREE.DirectionalLight(0xfffacd, 1.2);
         rimBack.position.set(0, -5, 4);
         scene.add(rimBack);
 
-        const pointBack = new THREE.PointLight(0xffffff, 1.0, 10);
+        const pointBack = new THREE.PointLight(0xffffff, 1.5, 10);
         pointBack.position.set(0, -3, -3);
         scene.add(pointBack);
 
@@ -91,7 +86,7 @@ export default function CoinViewer() {
                         roughnessMap: roughnessMap,
                         metalnessMap: metallicMap,
                         metalness: 1.0,
-                        roughness: 0.12,
+                        roughness: 0.08, // 하이라이트 선명
                         envMap: null,
                         envMapIntensity: 0
                     });
@@ -102,7 +97,6 @@ export default function CoinViewer() {
 
             scene.add(object);
 
-            // ----- 모델 중심/스케일 조정 -----
             const bbox = new THREE.Box3().setFromObject(object);
             const center = bbox.getCenter(new THREE.Vector3());
             const size = bbox.getSize(new THREE.Vector3());
@@ -136,7 +130,6 @@ export default function CoinViewer() {
         };
         window.addEventListener('resize', handleResize);
 
-        // Cleanup
         return () => {
             window.removeEventListener('resize', handleResize);
             if (req) cancelAnimationFrame(req);
