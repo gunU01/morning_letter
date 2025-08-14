@@ -21,41 +21,44 @@ export default function CoinViewer() {
         );
         camera.position.set(0, 0, 5);
 
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        // ✅ 투명 배경 활성화
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setPixelRatio(window.devicePixelRatio || 1);
         renderer.setSize(mountRef.current.clientWidth, mountRef.current.clientHeight);
         renderer.outputColorSpace = THREE.SRGBColorSpace;
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
         renderer.toneMappingExposure = 1.25;
-
+        renderer.setClearColor(0x000000, 0); // 투명 배경
         mountRef.current.appendChild(renderer.domElement);
 
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
 
+        // 💡 기본 조명
         scene.add(new THREE.AmbientLight(0xffffff, 0.5));
         const dir = new THREE.DirectionalLight(0xffffff, 2.0);
         dir.position.set(5, 10, 7.5);
         dir.castShadow = true;
         scene.add(dir);
 
-        // ✅ 텍스처 파일 이름의 오타를 수정했습니다.
+        // ✅ 텍스처 로드
         const textureLoader = new THREE.TextureLoader();
         const baseColor = textureLoader.load('/Smiley_Coin_0813083433_texture.png');
         const normalMap = textureLoader.load('/Smiley_Coin_0813083433_texture_normal.png');
         const roughnessMap = textureLoader.load('/Smiley_Coin_0813083433_texture_roughness.png');
         const metallicMap = textureLoader.load('/Smiley_Coin_0813083433_texture_metallic.png');
         
+        // ✅ HDRI 로드 (배경은 null, environment만 적용)
         new RGBELoader()
             .setPath('https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/')
-            .load('brown_photostudio_02_1k.hdr', (texture) => {
-                texture.mapping = THREE.EquirectangularReflectionMapping;
-                scene.background = texture;
-                scene.environment = texture;
+            .load('brown_photostudio_02_1k.hdr', (hdrTexture) => {
+                hdrTexture.mapping = THREE.EquirectangularReflectionMapping;
+
+                scene.background = null; // 배경 제거
+                scene.environment = hdrTexture; // 환경 반사만 적용
 
                 loadFBX();
             });
-
 
         const loadFBX = () => {
             const fbxLoader = new FBXLoader();
@@ -71,7 +74,7 @@ export default function CoinViewer() {
                                 metalnessMap: metallicMap,
                                 metalness: 0.9,
                                 roughness: 0.2,
-                                envMapIntensity: 1.0
+                                envMapIntensity: 1.5 // 반짝임 강도
                             });
 
                             child.material = newMat;
@@ -98,12 +101,12 @@ export default function CoinViewer() {
                     controls.update();
                 }
             );
-        }
+        };
 
         let req = null;
         const animate = () => {
             req = requestAnimationFrame(animate);
-            controls.update(); // 드래그, 줌, 회전 등 컨트롤을 업데이트
+            controls.update();
             renderer.render(scene, camera);
         };
         animate();
