@@ -12,7 +12,7 @@ export default function CoinViewer() {
 
         // ----- Scene -----
         const scene = new THREE.Scene();
-        scene.background = null; // 배경 제거
+        scene.background = null;
 
         // ----- Camera -----
         const camera = new THREE.PerspectiveCamera(
@@ -21,7 +21,7 @@ export default function CoinViewer() {
             0.1,
             1000
         );
-        camera.position.set(0, 0, 5);
+        camera.position.set(0, 0, 7);
 
         // ----- Renderer -----
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -29,50 +29,48 @@ export default function CoinViewer() {
         renderer.setSize(mountRef.current.clientWidth, mountRef.current.clientHeight);
         renderer.outputColorSpace = THREE.SRGBColorSpace;
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 1.8; // 밝기 강화
-        renderer.setClearColor(0x000000, 0); // 배경 투명
-
+        renderer.toneMappingExposure = 2.0; // 밝기 극대화
+        renderer.setClearColor(0x000000, 0);
         mountRef.current.appendChild(renderer.domElement);
 
         // ----- Controls -----
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
 
-        // ----- Lights: 금빛 + 강한 흰 조명 -----
-        // Key Light (금빛 주광)
-        const keyLight = new THREE.DirectionalLight(0xfff8dc, 2.5);
-        keyLight.position.set(5, 5, 5);
-        scene.add(keyLight);
+        // ----- Lights (양면) -----
+        // 앞면 조명
+        const keyFront = new THREE.DirectionalLight(0xfff8dc, 2.5);
+        keyFront.position.set(3, 4, 5);
+        scene.add(keyFront);
 
-        // Fill Light (강한 흰색 보조광)
-        const fillLight = new THREE.DirectionalLight(0xffffff, 2.0);
-        fillLight.position.set(-3, 2, 2);
-        scene.add(fillLight);
+        const fillFront = new THREE.DirectionalLight(0xffffff, 2.0);
+        fillFront.position.set(-3, 2, 3);
+        scene.add(fillFront);
 
-        // Rim Light (금빛 윤곽 강조)
-        const rimLight = new THREE.DirectionalLight(0xfffacd, 1.2);
-        rimLight.position.set(0, 5, -5);
-        scene.add(rimLight);
+        const rimFront = new THREE.DirectionalLight(0xfffacd, 1.2);
+        rimFront.position.set(0, 5, -4);
+        scene.add(rimFront);
 
-        // Point Light: 흰색 반사 강화
-        const brightWhite = new THREE.PointLight(0xffffff, 1.5, 10);
-        brightWhite.position.set(0, 3, 3);
-        scene.add(brightWhite);
+        const pointFront = new THREE.PointLight(0xffffff, 1.5, 10);
+        pointFront.position.set(0, 3, 3);
+        scene.add(pointFront);
 
-        // 기존 금빛 PointLight 유지
-        const pointLight1 = new THREE.PointLight(0xfffacd, 0.5, 10);
-        pointLight1.position.set(-2, 3, 3);
-        scene.add(pointLight1);
+        // 뒷면 조명 (반대편)
+        const keyBack = new THREE.DirectionalLight(0xfff8dc, 2.0);
+        keyBack.position.set(-3, -4, -5);
+        scene.add(keyBack);
 
-        const pointLight2 = new THREE.PointLight(0xfffacd, 0.4, 10);
-        pointLight2.position.set(2, -2, 3);
-        scene.add(pointLight2);
+        const fillBack = new THREE.DirectionalLight(0xffffff, 1.5);
+        fillBack.position.set(3, -2, -3);
+        scene.add(fillBack);
 
-        // ----- 흰색 단색 환경맵 (반사용) -----
-        const cubeData = new Uint8Array([255, 255, 255, 255]);
-        const whiteEnv = new THREE.CubeTexture();
-        whiteEnv.images = [cubeData, cubeData, cubeData, cubeData, cubeData, cubeData];
-        whiteEnv.needsUpdate = true;
+        const rimBack = new THREE.DirectionalLight(0xfffacd, 1.0);
+        rimBack.position.set(0, -5, 4);
+        scene.add(rimBack);
+
+        const pointBack = new THREE.PointLight(0xffffff, 1.0, 10);
+        pointBack.position.set(0, -3, -3);
+        scene.add(pointBack);
 
         // ----- Textures -----
         const textureLoader = new THREE.TextureLoader();
@@ -87,15 +85,15 @@ export default function CoinViewer() {
             object.traverse((child) => {
                 if (child.isMesh) {
                     child.material = new THREE.MeshStandardMaterial({
-                        color: 0xffd700, // 금색
+                        color: 0xffd700,
                         map: baseColor,
                         normalMap: normalMap,
                         roughnessMap: roughnessMap,
                         metalnessMap: metallicMap,
                         metalness: 1.0,
-                        roughness: 0.05,  // 매끄럽게
-                        envMap: whiteEnv, // 흰색 반사
-                        envMapIntensity: 1.5
+                        roughness: 0.12,
+                        envMap: null,
+                        envMapIntensity: 0
                     });
                     child.castShadow = true;
                     child.receiveShadow = true;
@@ -104,14 +102,14 @@ export default function CoinViewer() {
 
             scene.add(object);
 
-            // ----- 모델 프레이밍 -----
+            // ----- 모델 중심/스케일 조정 -----
             const bbox = new THREE.Box3().setFromObject(object);
             const center = bbox.getCenter(new THREE.Vector3());
             const size = bbox.getSize(new THREE.Vector3());
             const maxDim = Math.max(size.x, size.y, size.z);
             const fov = camera.fov * (Math.PI / 180);
             let camZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.5;
-            if (!isFinite(camZ)) camZ = 5;
+            if (!isFinite(camZ)) camZ = 7;
             camera.position.copy(center.clone().add(new THREE.Vector3(0, 0, camZ)));
             camera.near = Math.max(0.1, camZ / 100);
             camera.far = camZ * 100;
