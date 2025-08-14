@@ -7,26 +7,12 @@ import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
 export default function CoinViewer() {
     const mountRef = useRef(null);
 
-    // 흰색 큐브맵 생성 함수
-    const createWhiteCubeTexture = (renderer) => {
-        const size = 16;
-        const data = new Uint8Array(size * size * 3);
-        data.fill(255); // RGB 전부 255 → 흰색
-
-        const texture = new THREE.DataTexture(data, size, size, THREE.RGBFormat);
-        texture.needsUpdate = true;
-
-        const cubeRenderTarget = new THREE.WebGLCubeRenderTarget(size);
-        cubeRenderTarget.fromEquirectangularTexture(renderer, texture);
-
-        return cubeRenderTarget.texture;
-    };
-
     useEffect(() => {
         if (!mountRef.current) return;
 
         // ----- Scene -----
         const scene = new THREE.Scene();
+        scene.background = null; // 배경 제거
 
         // ----- Camera -----
         const camera = new THREE.PerspectiveCamera(
@@ -43,7 +29,8 @@ export default function CoinViewer() {
         renderer.setSize(mountRef.current.clientWidth, mountRef.current.clientHeight);
         renderer.outputColorSpace = THREE.SRGBColorSpace;
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 1.25;
+        renderer.toneMappingExposure = 1.8; // 밝기 강화
+        renderer.setClearColor(0x000000, 0); // 배경 투명
 
         mountRef.current.appendChild(renderer.domElement);
 
@@ -51,17 +38,41 @@ export default function CoinViewer() {
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
 
-        // ----- Lights -----
-        scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-        const dir = new THREE.DirectionalLight(0xffffff, 2.0);
-        dir.position.set(5, 10, 7.5);
-        dir.castShadow = true;
-        scene.add(dir);
+        // ----- Lights: 금빛 + 강한 흰 조명 -----
+        // Key Light (금빛 주광)
+        const keyLight = new THREE.DirectionalLight(0xfff8dc, 2.5);
+        keyLight.position.set(5, 5, 5);
+        scene.add(keyLight);
 
-        // ----- Environment Map (흰색 큐브맵) -----
-        const whiteEnvMap = createWhiteCubeTexture(renderer);
-        scene.environment = whiteEnvMap;
-        scene.background = null; // 배경 제거
+        // Fill Light (강한 흰색 보조광)
+        const fillLight = new THREE.DirectionalLight(0xffffff, 2.0);
+        fillLight.position.set(-3, 2, 2);
+        scene.add(fillLight);
+
+        // Rim Light (금빛 윤곽 강조)
+        const rimLight = new THREE.DirectionalLight(0xfffacd, 1.2);
+        rimLight.position.set(0, 5, -5);
+        scene.add(rimLight);
+
+        // Point Light: 흰색 반사 강화
+        const brightWhite = new THREE.PointLight(0xffffff, 1.5, 10);
+        brightWhite.position.set(0, 3, 3);
+        scene.add(brightWhite);
+
+        // 기존 금빛 PointLight 유지
+        const pointLight1 = new THREE.PointLight(0xfffacd, 0.5, 10);
+        pointLight1.position.set(-2, 3, 3);
+        scene.add(pointLight1);
+
+        const pointLight2 = new THREE.PointLight(0xfffacd, 0.4, 10);
+        pointLight2.position.set(2, -2, 3);
+        scene.add(pointLight2);
+
+        // ----- 흰색 단색 환경맵 (반사용) -----
+        const cubeData = new Uint8Array([255, 255, 255, 255]);
+        const whiteEnv = new THREE.CubeTexture();
+        whiteEnv.images = [cubeData, cubeData, cubeData, cubeData, cubeData, cubeData];
+        whiteEnv.needsUpdate = true;
 
         // ----- Textures -----
         const textureLoader = new THREE.TextureLoader();
@@ -72,46 +83,42 @@ export default function CoinViewer() {
 
         // ----- Load FBX -----
         const fbxLoader = new FBXLoader();
-        fbxLoader.load(
-            '/Smiley_Coin_0813083433_texture.fbx',
-            (object) => {
-                object.traverse((child) => {
-                    if (child.isMesh) {
-                        const newMat = new THREE.MeshStandardMaterial({
-                            map: baseColor,
-                            normalMap: normalMap,
-                            roughnessMap: roughnessMap,
-                            metalnessMap: metallicMap,
-                            metalness: 0.9,
-                            roughness: 0.2,
-                            envMap: whiteEnvMap,
-                            envMapIntensity: 1.0
-                        });
+        fbxLoader.load('/Smiley_Coin_0813083433_texture.fbx', (object) => {
+            object.traverse((child) => {
+                if (child.isMesh) {
+                    child.material = new THREE.MeshStandardMaterial({
+                        color: 0xffd700, // 금색
+                        map: baseColor,
+                        normalMap: normalMap,
+                        roughnessMap: roughnessMap,
+                        metalnessMap: metallicMap,
+                        metalness: 1.0,
+                        roughness: 0.05,  // 매끄럽게
+                        envMap: whiteEnv, // 흰색 반사
+                        envMapIntensity: 1.5
+                    });
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                }
+            });
 
-                        child.material = newMat;
-                        child.castShadow = true;
-                        child.receiveShadow = true;
-                    }
-                });
+            scene.add(object);
 
-                scene.add(object);
-
-                // ----- 모델 프레이밍 -----
-                const bbox = new THREE.Box3().setFromObject(object);
-                const center = bbox.getCenter(new THREE.Vector3());
-                const size = bbox.getSize(new THREE.Vector3());
-                const maxDim = Math.max(size.x, size.y, size.z);
-                const fov = camera.fov * (Math.PI / 180);
-                let camZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.5;
-                if (!isFinite(camZ)) camZ = 5;
-                camera.position.copy(center.clone().add(new THREE.Vector3(0, 0, camZ)));
-                camera.near = Math.max(0.1, camZ / 100);
-                camera.far = camZ * 100;
-                camera.updateProjectionMatrix();
-                controls.target.copy(center);
-                controls.update();
-            }
-        );
+            // ----- 모델 프레이밍 -----
+            const bbox = new THREE.Box3().setFromObject(object);
+            const center = bbox.getCenter(new THREE.Vector3());
+            const size = bbox.getSize(new THREE.Vector3());
+            const maxDim = Math.max(size.x, size.y, size.z);
+            const fov = camera.fov * (Math.PI / 180);
+            let camZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.5;
+            if (!isFinite(camZ)) camZ = 5;
+            camera.position.copy(center.clone().add(new THREE.Vector3(0, 0, camZ)));
+            camera.near = Math.max(0.1, camZ / 100);
+            camera.far = camZ * 100;
+            camera.updateProjectionMatrix();
+            controls.target.copy(center);
+            controls.update();
+        });
 
         // ----- Animate -----
         let req = null;
